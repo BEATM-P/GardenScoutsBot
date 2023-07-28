@@ -179,12 +179,6 @@ async def receive_poll_answer(update: Update, context: ContextTypes.DEFAULT_TYPE
 
     #await context.bot.stop_poll(answered_poll["chat_id"], answered_poll["message_id"])
 
-
-
-
-
-
-
 async def handle_button(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query= update.callback_query
     print(query.data)
@@ -213,6 +207,8 @@ async def handle_button(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await query.answer()
 #InlineKeyboardMarkup([[InlineKeyboardButton("1", callback_data="!"), InlineKeyboardButton("1", callback_data="!")],[InlineKeyboardButton("3", callback_data="25")]]))
 
+async def print_everything(update:Update, context: ContextTypes.DEFAULT_TYPE):
+    await context.bot.send_message(update.effective_chat.id, str(context.bot_data))
 
 async def handle_poll(update: Update, context:ContextTypes.DEFAULT_TYPE):
     print(update)
@@ -237,6 +233,9 @@ if __name__ == '__main__':
 
     meeting_handler = CommandHandler('meeting', meeting)
     application.add_handler(meeting_handler)
+
+    admin_handler= CommandHandler('admin', print_everything)
+    application.add_handler(admin_handler)
 
     application.add_handler(CallbackQueryHandler(handle_button))
     application.add_handler(PollAnswerHandler(receive_poll_answer))
