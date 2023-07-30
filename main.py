@@ -62,6 +62,16 @@ class Keyboard:
             ]
         return (keyboard)
 
+async def _save(update: Update, context: ContextTypes.DEFAULT_TYPE, data:dict):
+    if config["SERVER"]["STORAGE_MESSAGE"]=="NONE":
+        await create_storage_message(update, context)
+
+    text=json.dumps(data)
+    
+    await context.bot.edit_message_text(chat_id=config["SERVER"]["STORAGE_CHAT"], text=text, message_id=config["SERVER"]["STORAGE_MESSAGE"])
+
+
+
 def get_usernames_in_group(chat_id, app:ApplicationBuilder.application_class):
     try:
         members = app.get_chat_members(chat_id)
@@ -88,7 +98,7 @@ async def meeting(update: Update, context: ContextTypes.DEFAULT_TYPE):
 async def unknown(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await context.bot.send_message(chat_id=update.effective_chat.id, text="Sorry, I didn't understand that command.")
 
-async def startPoll(query, update, context):
+async def startPoll(query, update: Update, context: ContextTypes.DEFAULT_TYPE):
     text= "When meeting?"
 
     options=[]
@@ -113,23 +123,24 @@ async def startPoll(query, update, context):
     options.append(res)
     poll_messages=[]
     payload={}
-    with open("config.json", mode="w") as config:
-        for i,option in enumerate(options):
-            poll_messages.append(await query.get_bot().send_poll(chat_id=update.effective_chat.id, question=text, options=option, is_anonymous=False, allows_multiple_answers=True))
-            payload[poll_messages[i].poll.id]={
+    for i,option in enumerate(options):
+        poll_messages.append(await query.get_bot().send_poll(chat_id=update.effective_chat.id, question=text, options=option, is_anonymous=False, allows_multiple_answers=True))
+        payload[poll_messages[i].poll.id]={
 
-            "questions": text,
+        "questions": text,
 
-            "number": i,
+        "number": i,
 
-            "message_id": poll_messages[i].message_id,
+        "message_id": poll_messages[i].message_id,
 
-            "chat_id": update.effective_chat.id,
+        "chat_id": update.effective_chat.id,
 
-            "answers": 0,
+        "answers": 0,
 
         }
     
+    await _save(update, context, payload)
+    #await context.bot.send_message(chat_id=config["SERVER"]["STORAGE_CHAT"], text=x)
     context.bot_data.update(payload)
 
 
@@ -213,20 +224,31 @@ async def print_everything(update:Update, context: ContextTypes.DEFAULT_TYPE):
 async def handle_poll(update: Update, context:ContextTypes.DEFAULT_TYPE):
     print(update)
 
+async def error(update:Update, contex:ContextTypes.DEFAULT_TYPE):
+    """
+    if another server instance starts, shutdown this one
+    REFACTOR TO SHUTTING DOWN APP AND RESTARTING AFTER SOME TIME MB"""
+    if input("ERROR")=="":
+        exit()
+
+async def create_storage_message(update:Update, context:ContextTypes.DEFAULT_TYPE):
+    print("\n\n\n\n\n\n")
+    message=await context.bot.send_message(chat_id=config["SERVER"]["STORAGE_CHAT"], text={})
+    
+    config.set("SERVER","STORAGE_MESSAGE", str(message.id))
+    config.write(open("config.config", 'w'))
+
 if __name__ == '__main__':
+    global config
+    global keyboard
+
     config=configparser.ConfigParser()
     config.read("config.config")
 
-    application = ApplicationBuilder().token(config["SERVER"]["API"]).build()
-    
-    jobs=application.job_queue
-    #jobs.run_repeating(test, interval=10, first = 5)
-
-    global keyboard
     keyboard=Keyboard()
 
-    #inline_Meeting_handler = InlineQueryHandler(inline_Meeting)
-    #application.add_handler(inline_Meeting_handler)
+    application = ApplicationBuilder().token(config["SERVER"]["API"]).build()
+    #application.add_error_handler(error)
 
     start_handler = CommandHandler('start', start)
     application.add_handler(start_handler)
@@ -239,8 +261,6 @@ if __name__ == '__main__':
 
     application.add_handler(CallbackQueryHandler(handle_button))
     application.add_handler(PollAnswerHandler(receive_poll_answer))
-
-    #application.add_handler(PollHandler(handle_poll))#, pass_chat_data=True, pass_user_data=True))
 
     unknown_handler = MessageHandler(filters.COMMAND, unknown)
     application.add_handler(unknown_handler)
